@@ -52,8 +52,11 @@ object Server extends IOApp {
   ): IO[Unit] =
     for {
       config <- fetchLatestConfig(configRef)
+      _      <- IO(logger.info("Starting PlexRssSync (quick sync)"))
       _      <- PlexTokenSync.run(config, httpClient, runFullSync = false)
+      _      <- IO(logger.info(s"PlexRssSync completed, sleeping for ${config.refreshInterval.toSeconds} seconds"))
       _      <- IO.sleep(config.refreshInterval)
+      _      <- IO(logger.info("PlexRssSync woke up, starting next iteration"))
       _      <- plexRssSync(configRef, httpClient).handleErrorWith { err =>
         logger.error("Error in plexRssSync, retrying", err)
         IO.sleep(1.minute) >> plexRssSync(configRef, httpClient)
@@ -77,8 +80,11 @@ object Server extends IOApp {
   private def plexTokenDeleteSync(configRef: Ref[IO, Configuration], httpClient: HttpClient): IO[Unit] =
     for {
       config <- fetchLatestConfig(configRef)
+      _      <- IO(logger.info("Starting PlexTokenDeleteSync"))
       _      <- PlexTokenDeleteSync.run(config, httpClient)
+      _      <- IO(logger.info(s"PlexTokenDeleteSync completed, sleeping for ${config.deleteConfiguration.deleteInterval.toDays} days"))
       _      <- IO.sleep(config.deleteConfiguration.deleteInterval)
+      _      <- IO(logger.info("PlexTokenDeleteSync woke up, starting next iteration"))
       _      <- plexTokenDeleteSync(configRef, httpClient).handleErrorWith { err =>
         logger.error("Error in plexTokenDeleteSync, retrying", err)
         IO.sleep(1.minute) >> plexTokenDeleteSync(configRef, httpClient)
