@@ -31,6 +31,7 @@ object PlexTokenSync extends PlexUtils with SonarrUtils with RadarrUtils {
         config.plexConfiguration.plexWatchlistUrls.map(fetchWatchlistFromRss(client)).toList.sequence.map(Right(_))
       )
       watchlistData = watchlistDatas.flatten.toSet
+      _ = logger.info(s"Found ${watchlistData.size} items from RSS feeds")
       _ = if (runFullSync)
         logger.info(s"Found ${othersWatchlist.size} items on other available watchlists using the plex token")
       movies <- fetchMovies(client)(
@@ -44,7 +45,9 @@ object PlexTokenSync extends PlexUtils with SonarrUtils with RadarrUtils {
         config.sonarrConfiguration.sonarrBypassIgnored
       )
       allIds = movies ++ series
-      _ <- missingIds(client)(config)(allIds, selfWatchlist ++ othersWatchlist ++ watchlistData)
+      totalWatchlist = selfWatchlist ++ othersWatchlist ++ watchlistData
+      _ = logger.info(s"Found ${allIds.size} existing items in Sonarr/Radarr, checking against ${totalWatchlist.size} watchlist items")
+      _ <- missingIds(client)(config)(allIds, totalWatchlist)
     } yield ()
 
     result
@@ -70,21 +73,21 @@ object PlexTokenSync extends PlexUtils with SonarrUtils with RadarrUtils {
 
         case (false, "show") =>
           if (watchlistedItem.getTvdbId.isDefined) {
-            logger.debug(s"Found show \"${watchlistedItem.title}\" which does not exist yet in Sonarr")
+            logger.info(s"ADDING: Found show \"${watchlistedItem.title}\" which does not exist yet in Sonarr")
             Right(addToSonarr(client)(config.sonarrConfiguration)(watchlistedItem))
           } else {
-            logger.debug(
-              s"Found show \"${watchlistedItem.title}\" which does not exist yet in Sonarr, but we do not have the tvdb ID so will skip adding"
+            logger.info(
+              s"SKIPPING: Found show \"${watchlistedItem.title}\" which does not exist yet in Sonarr, but we do not have the tvdb ID so will skip adding"
             )
             Right(IO.unit)
           }
         case (false, "movie") =>
           if (watchlistedItem.getTmdbId.isDefined) {
-            logger.debug(s"Found movie \"${watchlistedItem.title}\" which does not exist yet in Radarr")
+            logger.info(s"ADDING: Found movie \"${watchlistedItem.title}\" which does not exist yet in Radarr")
             Right(addToRadarr(client)(config.radarrConfiguration)(watchlistedItem))
           } else {
-            logger.debug(
-              s"Found movie \"${watchlistedItem.title}\" which does not exist yet in Radarr, but we do not have the tmdb ID so will skip adding"
+            logger.info(
+              s"SKIPPING: Found movie \"${watchlistedItem.title}\" which does not exist yet in Radarr, but we do not have the tmdb ID so will skip adding"
             )
             Right(IO.unit)
           }
