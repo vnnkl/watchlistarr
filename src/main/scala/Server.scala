@@ -40,7 +40,10 @@ object Server extends IOApp {
       config <- fetchLatestConfig(configRef)
       _      <- PingTokenSync.run(config, httpClient)
       _      <- IO.sleep(24.hours)
-      _      <- pingTokenSync(configRef, httpClient)
+      _      <- pingTokenSync(configRef, httpClient).handleErrorWith { err =>
+        logger.error("Error in pingTokenSync, retrying", err)
+        IO.sleep(1.minute) >> pingTokenSync(configRef, httpClient)
+      }
     } yield ()
 
   private def plexRssSync(
@@ -51,7 +54,10 @@ object Server extends IOApp {
       config <- fetchLatestConfig(configRef)
       _      <- PlexTokenSync.run(config, httpClient, runFullSync = false)
       _      <- IO.sleep(config.refreshInterval)
-      _      <- plexRssSync(configRef, httpClient)
+      _      <- plexRssSync(configRef, httpClient).handleErrorWith { err =>
+        logger.error("Error in plexRssSync, retrying", err)
+        IO.sleep(1.minute) >> plexRssSync(configRef, httpClient)
+      }
     } yield ()
 
   private def plexFullSync(
@@ -62,7 +68,10 @@ object Server extends IOApp {
       config <- fetchLatestConfig(configRef)
       _      <- PlexTokenSync.run(config, httpClient, runFullSync = true)
       _      <- IO.sleep(19.minutes)
-      _      <- plexFullSync(configRef, httpClient)
+      _      <- plexFullSync(configRef, httpClient).handleErrorWith { err =>
+        logger.error("Error in plexFullSync, retrying", err)
+        IO.sleep(1.minute) >> plexFullSync(configRef, httpClient)
+      }
     } yield ()
 
   private def plexTokenDeleteSync(configRef: Ref[IO, Configuration], httpClient: HttpClient): IO[Unit] =
@@ -70,6 +79,9 @@ object Server extends IOApp {
       config <- fetchLatestConfig(configRef)
       _      <- PlexTokenDeleteSync.run(config, httpClient)
       _      <- IO.sleep(config.deleteConfiguration.deleteInterval)
-      _      <- plexTokenDeleteSync(configRef, httpClient)
+      _      <- plexTokenDeleteSync(configRef, httpClient).handleErrorWith { err =>
+        logger.error("Error in plexTokenDeleteSync, retrying", err)
+        IO.sleep(1.minute) >> plexTokenDeleteSync(configRef, httpClient)
+      }
     } yield ()
 }
